@@ -2,7 +2,7 @@ import tensorrt as trt
 from cuda import cudart
 from txt2img_pipeline import Txt2ImgPipeline  # Import your existing Txt2ImgPipeline
 
-class TRTSDXLPipeline:
+class TRTSDPipeline:
     def __init__(self, scheduler, denoising_steps, output_dir, version, max_batch_size=16, args=None):
         self.scheduler = scheduler
         self.denoising_steps = denoising_steps

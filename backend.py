@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Depends
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from uuid import uuid4
-from typing import Optional
 import re
 import psutil
 import socket
@@ -13,6 +12,7 @@ app = FastAPI()
 client = AsyncIOMotorClient("mongodb://localhost:27017/")
 db = client['hangman_game']
 leaderboard_collection = db['leaderboard']
+server_info = db['info']
 
 # In-memory database to store game states
 game_states = {}
@@ -48,6 +48,13 @@ def generate_hint():
 # Function to get game state
 def get_game_state(session_id: str):
     return game_states.get(session_id, None)
+
+def serialize_mongo_doc(doc):
+    doc_copy = doc.copy()
+    if "_id" in doc_copy:
+        doc_copy["_id"] = str(doc_copy["_id"])
+    return doc_copy
+
 
 # Initialize game state
 @app.get("/start")
@@ -105,8 +112,10 @@ async def update_leaderboard(username: str, score: int):
 async def get_leaderboard():
     leaderboard = []
     async for document in leaderboard_collection.find().sort("score", -1).limit(10):
-        leaderboard.append(document)
+        doc = serialize_mongo_doc(document.copy())
+        leaderboard.append(doc)
     return {"leaderboard": leaderboard}
+
 
 @app.get("/end/{session_id}")
 async def end_game(session_id: str, state: dict = Depends(get_game_state)):
@@ -133,10 +142,8 @@ async def read_alive():
 
     # Check MongoDB
     try:
-        client = AsyncIOMotorClient("mongodb://localhost:27017/")
-        db = client['alive']
-        await db.info.insert_one({"test": "1"})
-        await db.info.delete_one({"test": "1"})
+        await db["info"].insert_one({"test": "1"})
+        await db["info"].delete_one({"test": "1"})
         db_status = "MongoDB is alive"
     except Exception as e:
         db_status = f"MongoDB error: {e}"
@@ -162,8 +169,8 @@ async def read_alive():
         "memory_percent": f"{memory_percent}%",
         "disk_percent": f"{disk_percent}%"
     }
-    db.insert_one(info)
-    return info
+    await server_info.insert_one(serialize_mongo_doc(info))
+    return {"info":serialize_mongo_doc(info)}
 
 
 

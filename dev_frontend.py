@@ -2,6 +2,12 @@ import streamlit as st
 import requests
 import time
 
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = None
+
+if 'game_status' not in st.session_state:
+    st.session_state.game_status = None
+
 tab1, tab2, tab3, tab4 = st.tabs(
     ["Hangman Game", "Leaderboard", "Backend Status","about"]
     )
@@ -17,15 +23,16 @@ with tab1:
 
     if st.button("Start New Game"):
         # Pass the selected difficulty to the backend
-        response = requests.get(f"http://localhost:8000/start?difficulty={difficulty}")
-        data = response.json()
-        session_id = data['session_id']
-        st.session_state.session_id = session_id
-        st.session_state.game_status = "Game started"
-        st.write(f"Game started! Your session ID is {session_id}")
+        if st.session_state.session_id is None:
+            response = requests.get(f"http://localhost:8000/start?difficulty={difficulty}")
+            data = response.json()
+            session_id = data['session_id']
+            st.session_state.session_id = session_id
+            st.session_state.game_status = "Game started"
+            st.write(f"Game started! Your session ID is {session_id}")
 
 
-    if session_id:
+    if st.session_state.session_id:
         letter = st.text_input("Guess a letter:")
         if st.button("Guess"):
             response = requests.get(f"http://localhost:8000/guess/{session_id}/{letter}")
@@ -68,16 +75,21 @@ with tab3:
     response = requests.get("http://localhost:8000/alive")
     if response.status_code == 200:
         data = response.json()
+        st.write(data)
         st.write("Server is alive!")
-        st.write(f"Database status: {data['db_status']}")
-        st.write(f"CPU status: {data['cpu_status']} ({data['cpu_percent']})")
-        st.write(f"IP Address: {data['ip_address']}")
-        st.write(f"Memory Usage: {data['memory_percent']}")
-        st.write(f"Disk Usage: {data['disk_percent']}")
+
+        # Check if 'info' exists and then proceed
+        if 'info' in data and all(key in data['info'] for key in ['db_status', 'cpu_status', 'cpu_percent', 'ip_address', 'memory_percent', 'disk_percent']):
+            st.write(f"Database status: {data['info']['db_status']}")
+            st.write(f"CPU status: {data['info']['cpu_status']} ({data['info']['cpu_percent']})")
+            st.write(f"IP Address: {data['info']['ip_address']}")
+            st.write(f"Memory Usage: {data['info']['memory_percent']}")
+            st.write(f"Disk Usage: {data['info']['disk_percent']}")
+        else:
+            st.write("Some expected information is missing from the server response.")
     else:
         st.write("Server is down!")
 
-    time.sleep(3)
 
 with tab4:
     st.write("This is a simple hangman game built using Python and Streamlit. The backend is built using FastAPI and MongoDB. The source code for this project can be found on GitHub.")
